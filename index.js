@@ -1,10 +1,21 @@
 const express = require("express");
-const cors = require("cors"); // Required to allow your frontend (the previous HTML/React app) to communicate with this server.
+const cors = require("cors");
+// Required to allow your frontend (the previous HTML/React app) to communicate with this server.
 require("dotenv").config();
 
 // --- Configuration ---
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 5000;
+
+app.use(
+  cors({
+    origin: "http://localhost:5173", // or "*" for all origins (not for production)
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+
+app.use(express.json());
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.User_Name}:${process.env.User_Pass}@shanjid.wxj1xep.mongodb.net/?retryWrites=true&w=majority&appName=shanjid`;
@@ -20,34 +31,30 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-
     const database = client.db("invoice-generator");
     const osudsCollection = database.collection("osuds");
-    // 1. CREATE an Invoice (POST /api/invoices)
+
+    // ✅ Define the API route
     app.post("/api/invoices", async (req, res) => {
       try {
         const osuds = req.body;
-        console.log(osuds)
-        // Send a 201 Created status
-        res.status(201).json(savedInvoice);
+
+        const result = await osudsCollection.insertOne(osuds);
+        res.status(201).json({ message: "Invoice created", result });
       } catch (error) {
         console.error("Error creating invoice:", error.message);
-        // Error 400 Bad Request indicates client-side data validation failed (e.g., missing required field)
-        res
-          .status(400)
-          .json({ message: "Failed to create invoice.", error: error.message });
+        res.status(400).json({
+          message: "Failed to create invoice.",
+          error: error.message,
+        });
       }
     });
-    // Send a ping to confirm a successful connection
+
     await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+    console.log("✅ Connected to MongoDB!");
+  } catch (err) {
+    console.error(err);
   }
 }
 run().catch(console.dir);
